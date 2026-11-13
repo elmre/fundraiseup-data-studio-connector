@@ -75,161 +75,94 @@ function processNextConfig(configIndex, debugMode) {
   }
 }
 
+function getSpreadsheetHeaders(currentHeaders, newHeaders) {
+  const isCustom = header => typeof header === 'string' && header.startsWith('Custom Field ');
+  const baseHeaders = newHeaders.filter(header => !isCustom(header));
+  const customHeaders = [...currentHeaders, ...newHeaders].filter(isCustom);
+  return [...new Set([...baseHeaders, ...customHeaders])];
+}
+
+function buildSpreadsheetFields(headers, schemaFields) {
+  const fieldsByLabel = new Map();
+  schemaFields.forEach(field => {
+    if (!fieldsByLabel.has(field.label)) fieldsByLabel.set(field.label, field);
+  });
+
+  return headers.map((header, index) => {
+    const field = fieldsByLabel.get(header);
+    return {
+      col_number: index + 1,
+      name: field ? field.name : '',
+      letter: columnToLetter(index + 1),
+      spreadsheet_formula: field ? field.spreadsheet_formula || '' : '',
+      // Retained custom columns may be absent from the schema sample.
+      custom_field_label: field ? '' : header
+    };
+  });
+}
+
 /**
- * Check if schema migration is needed and perform it
- * Optimized for large datasets - uses in-place migration to avoid cell limits
- * Preserves custom fields that were dynamically added
- * @param {Sheet} sheet - Google Sheet object
- * @param {Array} newHeaders - New headers from schema
- * @returns {boolean} true if migration was performed
+ * Align columns without rewriting cell values or formulas.
+ * @returns {boolean} Whether the sheet structure changed.
  */
 function migrateSchemaIfNeeded(sheet, newHeaders) {
   const lastColumn = sheet.getLastColumn();
   const lastRow = sheet.getLastRow();
+  const currentHeaders = lastColumn > 0
+    ? sheet.getRange(1, 1, 1, lastColumn).getValues()[0]
+    : [];
+  const finalHeaders = getSpreadsheetHeaders(currentHeaders, newHeaders);
 
-  // If sheet is empty, no migration needed
-  if (lastColumn === 0 || lastRow === 0) {
-    Logger.log('migrateSchemaIfNeeded() - Sheet is empty, no migration needed');
-    return false;
-  }
+  if (!finalHeaders.length) return false;
 
-  // Get current headers
-  const currentHeaders = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
-
-  // Find custom fields in current headers (columns that start with "Custom Field")
-  const existingCustomFields = currentHeaders.filter(h => h && h.toString().startsWith('Custom Field'));
-
-  // Merge: new schema headers + existing custom fields not already in new headers
-  const customFieldsToPreserve = existingCustomFields.filter(cf => !newHeaders.includes(cf));
-  const finalHeaders = [...newHeaders, ...customFieldsToPreserve];
-
-  // Check if headers match exactly (same order and same columns)
-  const headersMatch = currentHeaders.length === finalHeaders.length &&
-    currentHeaders.every((header, index) => header === finalHeaders[index]);
-
-  if (headersMatch) {
+  if (currentHeaders.length === finalHeaders.length &&
+      currentHeaders.every((header, index) => header === finalHeaders[index])) {
     Logger.log('migrateSchemaIfNeeded() - Headers match, no migration needed');
     return false;
   }
 
   Logger.log('migrateSchemaIfNeeded() - Schema change detected, starting migration...');
   Logger.log('migrateSchemaIfNeeded() - Current columns: ' + currentHeaders.length + ', New columns: ' + finalHeaders.length);
-  Logger.log('migrateSchemaIfNeeded() - Total rows to migrate: ' + (lastRow - 1));
 
-  if (customFieldsToPreserve.length > 0) {
-    Logger.log('migrateSchemaIfNeeded() - Preserving custom fields: ' + customFieldsToPreserve.join(', '));
-  }
+  const addedColumns = finalHeaders.filter(header => !currentHeaders.includes(header));
+  const removedColumns = currentHeaders.filter(header => header && !finalHeaders.includes(header));
 
-  // Build a map: label -> old column index (0-based)
-  const oldHeaderMap = {};
-  currentHeaders.forEach((header, index) => {
-    if (header) {
-      oldHeaderMap[header] = index;
+  if (lastRow === 0) {
+    const missingColumns = finalHeaders.length - sheet.getMaxColumns();
+    if (missingColumns > 0) sheet.insertColumnsAfter(sheet.getMaxColumns(), missingColumns);
+  } else {
+    const workingHeaders = currentHeaders.slice();
+    finalHeaders.forEach((header, index) => {
+      const sourceIndex = workingHeaders.indexOf(header, index);
+      if (sourceIndex === index) return;
+
+      if (sourceIndex === -1) {
+        if (index < workingHeaders.length) {
+          sheet.insertColumnsBefore(index + 1, 1);
+        } else if (index >= sheet.getMaxColumns()) {
+          sheet.insertColumnsAfter(sheet.getMaxColumns(), 1);
+        }
+        sheet.getRange(1, index + 1, 1, 1).setValues([[header]]);
+      } else {
+        // Native moves preserve formulas and update references to moved cells.
+        sheet.moveColumns(sheet.getRange(1, sourceIndex + 1, 1, 1), index + 1);
+        workingHeaders.splice(sourceIndex, 1);
+      }
+      workingHeaders.splice(index, 0, header);
+    });
+
+    if (workingHeaders.length > finalHeaders.length) {
+      sheet.getRange(1, finalHeaders.length + 1, lastRow, workingHeaders.length - finalHeaders.length).clear();
     }
-  });
-
-  // Build column mapping array for faster processing
-  // columnMapping[newIndex] = oldIndex or -1 if new column
-  const columnMapping = finalHeaders.map(newHeader => {
-    const oldIndex = oldHeaderMap[newHeader];
-    return oldIndex !== undefined ? oldIndex : -1;
-  });
-
-  // If only header row exists, just update headers
-  if (lastRow === 1) {
-    // Clear extra columns if new schema has fewer columns
-    if (finalHeaders.length < currentHeaders.length) {
-      sheet.getRange(1, finalHeaders.length + 1, 1, currentHeaders.length - finalHeaders.length).clear();
-    }
-    sheet.getRange(1, 1, 1, finalHeaders.length).setValues([finalHeaders]).setFontWeight("bold").setWrap(true);
-    Logger.log('migrateSchemaIfNeeded() - Only headers existed, updated to new schema');
-    return true;
   }
 
-  // For large datasets, use in-place batch processing (no temp sheet to avoid cell limit)
-  const totalDataRows = lastRow - 1;
-
-  /**
-   * Batch size for migration processing.
-   * Larger batches = faster migration (fewer API calls to Sheets)
-   * but more memory usage and risk of timeout on single batch.
-   *
-   * Benchmarks (40000 rows, 130 columns):
-   * - 500 rows/batch  = ~11 min (too slow)
-   * - 2000 rows/batch = ~3-4 min (good balance)
-   * - 5000 rows/batch = ~2 min (may cause memory issues)
-   */
-  const BATCH_SIZE = 2000;
-
-  let processedRows = 0;
-
-  // Process data in batches - read, transform, write back in place
-  while (processedRows < totalDataRows) {
-    const startRow = processedRows + 2; // +2 because row 1 is header, and we're 1-indexed
-    const rowsToProcess = Math.min(BATCH_SIZE, totalDataRows - processedRows);
-
-    // Read batch from original sheet (all current columns)
-    const batchData = sheet.getRange(startRow, 1, rowsToProcess, lastColumn).getValues();
-
-    // Transform batch to new column order
-    const transformedBatch = transformDataBatch(batchData, columnMapping);
-
-    // Clear extra columns in this batch if we have fewer columns now
-    if (finalHeaders.length < lastColumn) {
-      sheet.getRange(startRow, finalHeaders.length + 1, rowsToProcess, lastColumn - finalHeaders.length).clear();
-    }
-
-    // Write transformed data back to the same rows
-    sheet.getRange(startRow, 1, rowsToProcess, finalHeaders.length).setValues(transformedBatch);
-
-    processedRows += rowsToProcess;
-
-    // Log progress for large migrations (every batch)
-    Logger.log('migrateSchemaIfNeeded() - Progress: ' + processedRows + '/' + totalDataRows + ' rows');
-
-    // Flush to commit changes and free memory
-    SpreadsheetApp.flush();
-  }
-
-  // Update headers
-  if (finalHeaders.length < currentHeaders.length) {
-    // Clear extra header columns
-    sheet.getRange(1, finalHeaders.length + 1, 1, currentHeaders.length - finalHeaders.length).clear();
-  }
-  sheet.getRange(1, 1, 1, finalHeaders.length).setValues([finalHeaders]).setFontWeight("bold").setWrap(true);
+  sheet.getRange(1, 1, 1, finalHeaders.length).setValues([finalHeaders]).setFontWeight('bold').setWrap(true);
   sheet.setFrozenRows(1);
 
-  // Log migration summary
-  const addedColumns = finalHeaders.filter(h => oldHeaderMap[h] === undefined);
-  const removedColumns = currentHeaders.filter(h => h && !finalHeaders.includes(h));
-
-  if (addedColumns.length > 0) {
-    Logger.log('migrateSchemaIfNeeded() - Added columns: ' + addedColumns.join(', '));
-  }
-  if (removedColumns.length > 0) {
-    Logger.log('migrateSchemaIfNeeded() - Removed columns: ' + removedColumns.join(', '));
-  }
-
-  Logger.log('migrateSchemaIfNeeded() - Migration completed. Rows migrated: ' + totalDataRows);
-
+  if (addedColumns.length) Logger.log('migrateSchemaIfNeeded() - Added columns: ' + addedColumns.join(', '));
+  if (removedColumns.length) Logger.log('migrateSchemaIfNeeded() - Removed columns: ' + removedColumns.join(', '));
+  Logger.log('migrateSchemaIfNeeded() - Migration completed. Existing cell contents preserved.');
   return true;
-}
-
-/**
- * Transform a batch of data rows to new column order
- * @param {Array} batchData - 2D array of row data
- * @param {Array} columnMapping - Array where columnMapping[newIndex] = oldIndex or -1
- * @returns {Array} Transformed 2D array
- */
-function transformDataBatch(batchData, columnMapping) {
-  return batchData.map(row => {
-    return columnMapping.map(oldIndex => {
-      if (oldIndex === -1) {
-        return ''; // New column
-      }
-      return row[oldIndex];
-    });
-  });
 }
 
 function updateSpreadsheet(config, request) {
@@ -252,9 +185,6 @@ function updateSpreadsheet(config, request) {
 
   Logger.log('updateSpreadsheet() - Sheet name "'+ sheetName + '"');
 
-  //define field schema, which will be added to the row headers
-  let headers = [];
-
   request = request || {};
 
   // In case we need to use another API key
@@ -266,25 +196,12 @@ function updateSpreadsheet(config, request) {
   request['livemode'] = livemode;
 
   const schema = getSchema({'api_key': api_key, 'livemode': livemode});
-  request['fields'] = request['fields'] || [];
-
-  // add every field label to the headers array
-  for ( let i = 0; i < schema.schema.length; i++ ) {
-      headers.push(schema.schema[i].label);
-
-      // request required data for buildRow() function
-      request['fields'].push({
-          'col_number': i + 1,
-          'name': schema.schema[i].name,
-          'letter': columnToLetter(i + 1),
-          'spreadsheet_formula': schema.schema[i].spreadsheet_formula || '',
-      });
-  }
-
-  // to be safe - remove duplicates from headers array
-  headers = headers.filter(function(item, pos){
-      return headers.indexOf(item) === pos;
-  });
+  const lastColumn = sheet.getLastColumn();
+  const currentHeaders = lastColumn > 0
+    ? sheet.getRange(1, 1, 1, lastColumn).getValues()[0]
+    : [];
+  const headers = getSpreadsheetHeaders(currentHeaders, schema.schema.map(field => field.label));
+  request.fields = buildSpreadsheetFields(headers, schema.schema);
 
   if ( !headers.length ) {
       console.log('updateSpreadsheet() - Error: headers row not defined');
@@ -294,9 +211,6 @@ function updateSpreadsheet(config, request) {
   // Check and perform schema migration if needed
   migrateSchemaIfNeeded(sheet, headers);
 
-  // add header row into spreadsheet (in case migration didn't happen or sheet was empty)
-  const headerRow = sheet.getRange(1,1,1,headers.length);
-  headerRow.setValues([headers]).setFontWeight("bold").setWrap(true);
   sheet.setFrozenRows(1);
 
   // Find Donation ID column index

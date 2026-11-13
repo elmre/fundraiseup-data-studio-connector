@@ -256,6 +256,12 @@ function buildRows(request, data, type = '') {
           // parse formula then add as formula string
           row.push( parseFormula(field, request, row_number) );
 
+        } else if (type === 'spreadsheet' && field.custom_field_label) {
+
+          const customField = (donation.custom_fields || []).find(customField =>
+            'Custom Field ' + convertToTitleCase(customField.name) === field.custom_field_label);
+          row.push(customField ? customField.value : '');
+
         } else if ( field.name in donation ) {
 
           // add from original response object
