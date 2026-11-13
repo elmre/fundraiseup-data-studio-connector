@@ -69,7 +69,7 @@ function getConfig(request) {
 
 /**
  * Extract API credentials from request object
- * @param {Object} request - Request object from Looker Studio or manual call
+ * @param {Object} request - Request object from Data Studio or manual call
  * @returns {Object} { apiKey, livemode }
  */
 function getApiCredentials(request) {
@@ -311,7 +311,7 @@ function getData(request) {
 
   schema.push(...customFieldsSchema);
 
-  // Get the fields requested by Looker Studio
+  // Get the fields requested by Data Studio
   let dataSchema = [];
   request.fields.forEach(function (field) {
       for (const element of schema) {

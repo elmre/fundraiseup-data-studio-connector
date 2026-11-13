@@ -1,6 +1,6 @@
-Fundraise Up REST API - Looker Studio Connector
+Fundraise Up REST API - Data Studio Connector
 =============
-This repository contains a [community connector](https://developers.google.com/looker-studio/connector "community connector") script to fetch donations data from FundraiseUp and visualize it in Looker Studio using Google Apps Script.
+This repository contains a [community connector](https://developers.google.com/data-studio/connector "community connector") script to fetch donations data from FundraiseUp and visualize it in Data Studio using Google Apps Script.
 
 For a detailed walkthrough of Fundraise Up REST API, check out [documentation](https://fundraiseup.com/docs/rest-api/ "documentation").
 
@@ -9,7 +9,7 @@ Features
 -------------
 - Fetch dynamic donations data based on API key input.
 - No authentication required.
-- Seamlessly integrates with Looker Studio for data visualization.
+- Seamlessly integrates with Data Studio for data visualization.
 - Google Sheets Support - automatically adds new rows to the sheet.
 
 
@@ -20,11 +20,11 @@ Usage
 - Copy and paste the provided script into the editor.
 - Save and deploy the script as a web app.
 
-#### Integration in Looker Studio
-- Use the deployed script URL as the data source in Looker Studio.
+#### Integration in Data Studio
+- Use the deployed script URL as the data source in Data Studio.
 - To obtain API key open [Fundraise Up Dashboard](https://dashboard.fundraiseup.com/ "Fundraise Up Dashboard") > Settings > API keys and click Create API key.
 - Configure the data source by specifying the desired API key.
-- Visualize the fetched data using Looker Studio tools.
+- Visualize the fetched data using Data Studio tools.
 
 #### Connect Google Spreadsheet
 1. Create an empty [Google Spreadsheet](https://docs.google.com/spreadsheets/ "Google Spreadsheet") and copy the ID from URL.
@@ -43,7 +43,7 @@ Usage
 ```
 
 5. At the left, click **Triggers** ⏰, at the bottom right, click **Add Trigger**, select and configure the time-driven trigger to run function `runScheduledTask()`
-6. Connect your spreadsheet as a data source in Looker Studio.
+6. Connect your spreadsheet as a data source in Data Studio.
 
 
 Schema
@@ -53,9 +53,9 @@ Supports 100+ fields declared in documentation. Do not support ```questions``` f
 
 Example
 -------------
-Example of data visualize by Looker Studio report.
+Example of data visualize by Data Studio report.
 
-![Looker Studio Report Example](./Example.png)
+![Data Studio Report Example](./Example.png)
 
 
 Local Development
@@ -86,7 +86,7 @@ Project Structure
 | `_Schema.gs` | Data schema definition (100+ fields) |
 | `ApiClient.gs` | FundraiseUp API client with pagination |
 | `Async.gs` | Async execution via time-based triggers |
-| `Connector.gs` | Main Looker Studio connector logic |
+| `Connector.gs` | Main Data Studio connector logic |
 | `DataCache.gs` | Caching layer for API responses |
 | `Env.gs` | Environment configuration helpers |
 | `RateLimiter.gs` | API rate limiting (8/sec, 128/min) |

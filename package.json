@@ -1,7 +1,7 @@
 {
-  "name": "fundraiseup-looker-studio-connector",
+  "name": "fundraiseup-data-studio-connector",
   "version": "1.0.0",
-  "description": "Looker Studio connector for FundraiseUp",
+  "description": "Data Studio connector for FundraiseUp",
   "scripts": {
     "start": "clasp push --watch --force",
     "login": "clasp login",

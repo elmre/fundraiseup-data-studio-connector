@@ -1,5 +1,5 @@
 /**
- * Constants and configuration values for FundraiseUp Looker Studio Connector
+ * Constants and configuration values for FundraiseUp Data Studio Connector
  * Centralized location for all magic numbers, URLs, and limits
  */
 
