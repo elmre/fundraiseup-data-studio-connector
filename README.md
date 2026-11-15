@@ -81,6 +81,12 @@ REST responses are cached per Google user, API key, mode and date range for up t
 
 Each REST request is limited to **100,000 donations** and **four minutes of API fetching**, with at most three concurrent calls and retries for temporary errors. Incomplete downloads return an error. These limits do not guarantee a successful 100,000-row load; use shorter ranges for large accounts.
 
+## Example
+
+Example of a Data Studio report built with this connector.
+
+![Data Studio Report Example](./Example.png)
+
 ## Local Development
 
 Use Node.js 24 (see `.nvmrc`) and [clasp 3.x](https://github.com/google/clasp/tree/v3.4.1).

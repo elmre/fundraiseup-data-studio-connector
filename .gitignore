@@ -21,7 +21,6 @@ token*.json
 *.log
 .private/
 .local/
-/Example.png
 
 # macOS
 .DS_Store
