@@ -2,19 +2,41 @@
   "name": "fundraiseup-data-studio-connector",
   "version": "1.0.0",
   "description": "Data Studio connector for FundraiseUp",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "start": "clasp push --watch --force",
+    "start": "clasp push --watch",
     "login": "clasp login",
     "push": "clasp push",
     "pull": "clasp pull",
-    "deploy": "clasp deploy",
-    "open": "clasp open",
-    "version": "clasp version",
-    "versions": "clasp versions",
-    "watch": "clasp push --watch --force"
+    "deploy": "clasp update-deployment",
+    "deployments": "clasp list-deployments",
+    "open": "clasp open-script",
+    "status": "clasp show-file-status",
+    "version": "clasp create-version",
+    "versions": "clasp list-versions",
+    "watch": "clasp push --watch",
+    "mcp": "clasp start-mcp-server",
+    "format": "prettier --write \"*.gs\""
+  },
+  "prettier": {
+    "tabWidth": 2,
+    "singleQuote": true,
+    "semi": true,
+    "printWidth": 100,
+    "overrides": [
+      {
+        "files": "*.gs",
+        "options": {
+          "parser": "babel"
+        }
+      }
+    ]
   },
   "devDependencies": {
-    "@google/clasp": "^3.2.0",
-    "@types/google-apps-script": "^1.0.83"
+    "@google/clasp": "^3.4.1",
+    "@types/google-apps-script": "^1.0.83",
+    "prettier": "3.10.1"
   }
 }

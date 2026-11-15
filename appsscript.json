@@ -3,12 +3,20 @@
   "dependencies": {},
   "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8",
+  "oauthScopes": ["https://www.googleapis.com/auth/script.external_request"],
+  "urlFetchWhitelist": ["https://api.fundraiseup.com/v1/"],
   "dataStudio": {
-    "name": "Data Studio FundraiseUp Connector",
-    "company": "Undefined",
+    "name": "Fundraise Up",
+    "company": "Lúgh Studio",
+    "companyUrl": "https://lughstudio.com/",
     "logoUrl": "https://gdm-catalog-fmapi-prod.imgix.net/ProductLogo/c0bea34d-f78b-490e-87aa-bcce74bedb66.png",
     "addonUrl": "https://github.com/elmre/fundraiseup-data-studio-connector",
     "supportUrl": "https://github.com/elmre/fundraiseup-data-studio-connector/issues",
-    "description": "Connector to fetch donations data from FundraiseUp"
+    "privacyPolicyUrl": "https://lughstudio.com/privacy-policy/",
+    "termsOfServiceUrl": "https://lughstudio.com/privacy-policy/",
+    "authType": ["NONE"],
+    "feeType": ["FREE"],
+    "shortDescription": "Visualize Fundraise Up donations directly from the REST API using your API key.",
+    "description": "Read Fundraise Up donations directly using an API key with donations read access. Reports filter by donation creation date in UTC. Large date ranges may need to be reduced."
   }
 }

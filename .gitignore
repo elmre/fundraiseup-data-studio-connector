@@ -8,6 +8,21 @@ package-lock.json
 .clasprc.json
 .clasp.json
 
+# Local credentials and private diagnostics
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+credentials*.json
+client_secret*.json
+token*.json
+*.log
+.private/
+.local/
+/Example.png
+
 # macOS
 .DS_Store
 
@@ -17,3 +32,4 @@ package-lock.json
 *.swp
 *.swo
 *~
+/.git/
